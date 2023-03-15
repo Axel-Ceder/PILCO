@@ -3,7 +3,8 @@ import tensorflow as tf
 import gpflow
 import pandas as pd
 import time
-
+import matplotlib.pyplot as plt
+tf.compat.v1.enable_eager_execution()
 from .mgpr import MGPR
 from .smgpr import SMGPR
 from .. import controllers
@@ -64,7 +65,7 @@ class PILCO(gpflow.models.BayesianModel):
             noises['GP' + str(i)] = np.array([model.likelihood.variance.numpy()])
             i += 1
         print('-----Learned models------')
-        pd.set_option('precision', 3)
+        pd.set_option('display.precision', 3)
         print('---Lengthscales---')
         print(pd.DataFrame(data=lengthscales))
         print('---Variances---')
@@ -90,18 +91,18 @@ class PILCO(gpflow.models.BayesianModel):
             self.optimizer.minimize(self.training_loss, self.trainable_variables, options=dict(maxiter=maxiter))
             # self.optimizer.minimize(self.training_loss, self.trainable_variables)
         end = time.time()
-        print("Controller's optimization: done in %.1f seconds with reward=%.3f." % (end - start, self.compute_reward()))
+        best_reward = self.compute_reward()
+        print("Controller's optimization: done in %.1f seconds with reward=%.3f." % (end - start, best_reward))
         restarts -= 1
 
         best_parameter_values = [param.numpy() for param in self.trainable_parameters]
-        best_reward = self.compute_reward()
         for restart in range(restarts):
             self.controller.randomize()
             start = time.time()
             self.optimizer.minimize(self.training_loss, self.trainable_variables, options=dict(maxiter=maxiter))
             end = time.time()
             reward = self.compute_reward()
-            print("Controller's optimization: done in %.1f seconds with reward=%.3f." % (end - start, self.compute_reward()))
+            print("Controller's optimization: done in %.1f seconds with reward=%.3f." % (end - start, reward))
             if reward > best_reward:
                 best_parameter_values = [param.numpy() for param in self.trainable_parameters]
                 best_reward = reward
@@ -115,26 +116,37 @@ class PILCO(gpflow.models.BayesianModel):
     def compute_action(self, x_m):
         return self.controller.compute_action(x_m, tf.zeros([self.state_dim, self.state_dim], float_type))[0]
 
+    # def predict(self, m_x, s_x, n):
+    #     loop_vars = [
+    #         tf.constant(0, tf.int32),
+    #         m_x,
+    #         s_x,
+    #         tf.constant([[0]], float_type)
+    #     ]
+
+    #     _, m_x, s_x, reward = tf.while_loop(
+    #         # Termination condition
+    #         lambda j, m_x, s_x, reward: j < n,
+    #         # Body function
+    #         lambda j, m_x, s_x, reward: (
+    #             j + 1,
+    #             *self.propagate(m_x, s_x),
+    #             tf.add(reward, self.reward.compute_reward(m_x, s_x)[0])
+    #         ), loop_vars
+    #     )
+    #     return m_x, s_x, reward
+
+    # Easier to understand, and does not throw warnings
     def predict(self, m_x, s_x, n):
-        loop_vars = [
-            tf.constant(0, tf.int32),
-            m_x,
-            s_x,
-            tf.constant([[0]], float_type)
-        ]
+        reward = 0.0
+        for j in range(n):
+            m_x_new, s_x_new = self.propagate(m_x, s_x)
 
-        _, m_x, s_x, reward = tf.while_loop(
-            # Termination condition
-            lambda j, m_x, s_x, reward: j < n,
-            # Body function
-            lambda j, m_x, s_x, reward: (
-                j + 1,
-                *self.propagate(m_x, s_x),
-                tf.add(reward, self.reward.compute_reward(m_x, s_x)[0])
-            ), loop_vars
-        )
+            reward += self.reward.compute_reward(m_x_new, s_x_new)[0]
+            m_x = m_x_new; s_x = s_x_new
+
         return m_x, s_x, reward
-
+    
     def propagate(self, m_x, s_x):
         m_u, s_u, c_xu = self.controller.compute_action(m_x, s_x)
 

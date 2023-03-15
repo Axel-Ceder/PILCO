@@ -4,7 +4,7 @@ from gym import make
 float_type = config.default_float()
 
 
-def rollout(env, pilco, timesteps, verbose=True, random=False, SUBS=1, render=False):
+def rollout(env, pilco, timesteps, verbose=False, random=False, SUBS=1, render=False):
         X = []; Y = [];
         x = env.reset()
         ep_return_full = 0
@@ -48,7 +48,7 @@ class Normalised_Env():
 
     def step(self, action):
         ob, r, done, _ = self.env.step(action)
-        return self.state_trans(ob), r, done, {}
+        return self.state_trans(ob), r, done, {};
 
     def reset(self):
         ob =  self.env.reset()

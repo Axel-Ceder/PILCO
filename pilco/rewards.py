@@ -60,6 +60,17 @@ class LinearReward(Module):
         sR = tf.transpose(self.W) @ s @ self.W
         return muR, sR
 
+class SquareReward(Module):
+    def __init__(self, state_dim, W):
+        self.state_dim = state_dim
+        self.W = Parameter(np.reshape(W, (state_dim, state_dim)), trainable=False)
+
+    def compute_reward(self, m, s):
+        #muR = -m[0,0]**2 - m[0,1]**2*0.01
+        muR = -(tf.reshape(m, (1, self.state_dim)) @ self.W  @ tf.reshape(m, (self.state_dim,1) ))
+        #sR = s
+        sR = tf.transpose(self.W) @ s @ self.W
+        return muR, sR
 
 class CombinedRewards(Module):
     def __init__(self, state_dim, rewards=[], coefs=None):

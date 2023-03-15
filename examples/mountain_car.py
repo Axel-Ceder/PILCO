@@ -11,7 +11,7 @@ from utils import policy, rollout, Normalised_Env
 
 SUBS = 5
 T = 25
-env = gym.make('MountainCarContinuous-v0')
+env = gym.make('MountainCarContinuous-v0', render_mode="rgb_array")
 # Initial random rollouts to generate a dataset
 X1,Y1, _, _ = rollout(env=env, pilco=None, random=True, timesteps=T, SUBS=SUBS, render=True)
 for i in range(1,5):
